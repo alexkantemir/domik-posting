@@ -90,6 +90,19 @@
 </div>
 {% endif %}
 
+{% set all_failed = posts | selectattr("status", "equalto", "failed") | list | length == posts | length and posts | length > 0 %}
+{% if all_failed %}
+<div class="alert alert-warning mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+  Не удалось сгенерировать посты. <a href="/content/new" class="alert-link">Попробуйте создать новый материал</a>.
+</div>
+{% elif user.role == 'editor' %}
+<div class="alert alert-info mb-3" role="alert">
+  <i class="bi bi-info-circle" aria-hidden="true"></i>
+  Черновики готовы. После сохранения правок материал будет доступен согласующему для проверки и публикации.
+</div>
+{% endif %}
+
 <div class="mt-4 d-flex gap-2 flex-wrap">
   {% if user.role != 'editor' %}
   <a href="/posts/approve/{{ item.id }}"
@@ -136,6 +149,7 @@ function savePost(id) {
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
   const fd = new FormData();
   fd.append('text', ta.value);
+  fd.append('csrf_token', CSRF_TOKEN);
   fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {

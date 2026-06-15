@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.csrf import validate_csrf
 from app.database import get_db
 from app.jinja import templates
 from app.models import ContentItem, GeneratedPost, Publication
@@ -88,11 +89,13 @@ def content_new_submit(
     caption: Optional[str] = Form(None),
     url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
+    csrf_token: str = Form(default=""),
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+    validate_csrf(request, csrf_token)
 
     # Сохраняем файл если есть
     file_paths = []
@@ -158,9 +161,10 @@ def content_new_submit(
     except Exception as e:
         db.delete(item)
         db.commit()
+        logger.error("GigaChat generation error: %s", e, exc_info=True)
         return templates.TemplateResponse(
             request, "content_new.html",
-            {"user": user, "error": f"Ошибка GigaChat: {e}"},
+            {"user": user, "error": "Ошибка при генерации постов. Попробуйте снова."},
         )
 
     # Сохраняем черновики
@@ -290,6 +294,7 @@ async def approve_submit(
         return RedirectResponse(url="/dashboard", status_code=302)
 
     form = await request.form()
+    validate_csrf(request, form.get("csrf_token", ""))
     action = form.get("action", "approve")
 
     posts = db.query(GeneratedPost).filter(GeneratedPost.content_item_id == item_id).all()
@@ -410,6 +415,7 @@ async def save_post_text(request: Request, post_id: int, db: Session = Depends(g
         return JSONResponse({"error": "cannot edit"}, status_code=400)
 
     form = await request.form()
+    validate_csrf(request, form.get("csrf_token", ""))
     text = (form.get("text") or "").strip()
     post.text = text
     db.commit()

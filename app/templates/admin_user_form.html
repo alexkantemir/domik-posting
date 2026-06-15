@@ -20,6 +20,7 @@
 <div class="stat-card" style="max-width:480px;">
   <form method="post"
         action="{% if target %}/admin/users/{{ target.id }}/edit{% else %}/admin/users/new{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <div class="mb-3">
       <label class="form-label fw-semibold" style="color:#1a3c5e; font-size:.9rem;">Имя</label>

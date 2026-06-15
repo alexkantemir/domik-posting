@@ -47,6 +47,7 @@
     <i class="bi bi-key"></i> Изменить пароль
   </div>
   <form method="post" action="/admin/profile">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="mb-3">
       <label class="form-label" style="font-size:.88rem; font-weight:500;">Текущий пароль</label>
       <input type="password" name="password_old" class="form-control" required

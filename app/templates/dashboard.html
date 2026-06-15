@@ -110,7 +110,10 @@
       <tbody>
         {% for item in recent %}
         {% set st = item_statuses.get(item.id, 'unknown') %}
-        <tr style="cursor:pointer;" onclick="location.href='{% if st == 'pending' and user.role == 'approver' %}/posts/approve/{{ item.id }}{% else %}/content/{{ item.id }}/preview{% endif %}'">
+        {% set row_href = '/posts/approve/' + item.id|string if (st == 'pending' and user.role == 'approver') else '/content/' + item.id|string + '/preview' %}
+        <tr style="cursor:pointer;" tabindex="0"
+            onclick="location.href='{{ row_href }}'"
+            onkeydown="if(event.key==='Enter'||event.key===' ')location.href='{{ row_href }}'">
           <td>
             {% if item.type == 'text' %}📝
             {% elif item.type == 'url' %}🔗

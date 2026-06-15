@@ -64,6 +64,7 @@
             </a>
             {% if u.id != user.id %}
             <form method="post" action="/admin/users/{{ u.id }}/toggle" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button type="submit" class="btn btn-sm {% if u.active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
                       style="border-radius:6px;"
                       onclick="return confirm('{% if u.active %}Деактивировать{% else %}Активировать{% endif %} пользователя {{ u.name }}?')">

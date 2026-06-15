@@ -19,6 +19,7 @@ UPLOAD_FILES = [
     "app/__init__.py",
     "app/main.py",
     "app/jinja.py",
+    "app/csrf.py",
     "app/config.py",
     "app/database.py",
     "app/models.py",

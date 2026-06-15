@@ -15,6 +15,7 @@
 
 <div class="stat-card">
   <form method="post" action="/content/new" enctype="multipart/form-data" id="uploadForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <!-- Тип материала -->
     <div class="mb-4">

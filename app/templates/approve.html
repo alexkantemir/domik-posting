@@ -38,7 +38,8 @@
 </div>
 {% endif %}
 
-<form method="post" action="/posts/approve/{{ item.id }}">
+<form method="post" action="/posts/approve/{{ item.id }}" id="approveForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   <!-- Посты по платформам -->
   {% for post in posts %}
@@ -149,17 +150,44 @@
             style="background:#1a3c5e;color:#fff;border-radius:8px;">
       <i class="bi bi-check2-circle"></i> Одобрить и опубликовать
     </button>
-    <button type="submit" name="action" value="reject_all"
+    <button type="button"
             class="btn btn-outline-danger px-3" style="border-radius:8px;"
-            onclick="return confirm('Отклонить все посты?')">
-      <i class="bi bi-x-circle"></i> Отклонить всё
+            data-bs-toggle="modal" data-bs-target="#rejectModal">
+      <i class="bi bi-x-circle" aria-hidden="true"></i> Отклонить всё
     </button>
     <a href="/dashboard" class="btn btn-light" style="border-radius:8px;">На главную</a>
   </div>
 
 </form>
 
+<!-- Модальное окно подтверждения отклонения -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-modal="true" role="dialog">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rejectModalLabel">Отклонить материал?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        Все черновики будут отклонены. Действие нельзя отменить.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger" onclick="submitReject()">Отклонить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+function submitReject() {
+  bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
+  const inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'action'; inp.value = 'reject_all';
+  document.getElementById('approveForm').appendChild(inp);
+  document.getElementById('approveForm').submit();
+}
+
 const PLATFORM_LIMITS = {
   telegram_channel: 4096,
   telegram_group: 4096,
@@ -224,6 +252,7 @@ function savePost(id) {
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
   const fd = new FormData();
   fd.append('text', ta.value);
+  fd.append('csrf_token', CSRF_TOKEN);
   fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {

@@ -21,8 +21,11 @@
 
 {% if items %}
 {% for item in items %}
-<div class="stat-card mb-3" style="cursor:pointer;"
-     onclick="location.href='{% if page_type == 'pending' and user.role == 'approver' %}/posts/approve/{{ item.id }}{% else %}/content/{{ item.id }}/preview{% endif %}'">
+{% set card_href = '/posts/approve/' + item.id|string if (page_type == 'pending' and user.role == 'approver') else '/content/' + item.id|string + '/preview' %}
+<div class="stat-card mb-3" style="cursor:pointer;" tabindex="0"
+     onclick="location.href='{{ card_href }}'"
+     onkeydown="if(event.key==='Enter'||event.key===' ')location.href='{{ card_href }}'"
+     role="button" aria-label="Открыть материал #{{ item.id }}">
 
   <div class="d-flex align-items-start justify-content-between mb-2">
     <div style="flex:1; min-width:0;">

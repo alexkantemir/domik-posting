@@ -64,11 +64,13 @@
     {% endif %}
 
     <form method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="mb-3">
         <label for="email">Email</label>
         <input
           type="email" id="email" name="email"
           class="form-control mt-1" placeholder="you@domik-l.spb.ru"
+          value="{{ email }}"
           required autofocus
         >
       </div>

@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, hash_password
+from app.csrf import validate_csrf
 from app.database import get_db
 from app.jinja import templates
 from app.models import User
@@ -59,10 +60,12 @@ async def user_new_submit(
     email: str = Form(...),
     role: str = Form(...),
     password: str = Form(...),
+    csrf_token: str = Form(default=""),
 ):
     user, redir = _require_admin(request, db)
     if redir:
         return redir
+    validate_csrf(request, csrf_token)
 
     if role not in ROLES:
         return templates.TemplateResponse(request, "admin_user_form.html", {
@@ -117,10 +120,12 @@ async def user_edit_submit(
     email: str = Form(...),
     role: str = Form(...),
     password: str = Form(""),
+    csrf_token: str = Form(default=""),
 ):
     user, redir = _require_admin(request, db)
     if redir:
         return redir
+    validate_csrf(request, csrf_token)
 
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -169,6 +174,8 @@ async def user_toggle(user_id: int, request: Request, db: Session = Depends(get_
     user, redir = _require_admin(request, db)
     if redir:
         return redir
+    form = await request.form()
+    validate_csrf(request, form.get("csrf_token", ""))
     if user_id == user.id:
         request.session["flash"] = "Нельзя деактивировать самого себя."
         return RedirectResponse(url="/admin/users", status_code=302)
@@ -201,11 +208,13 @@ async def profile_submit(
     password_old: str = Form(...),
     password_new: str = Form(...),
     password_new2: str = Form(...),
+    csrf_token: str = Form(default=""),
 ):
     from app.auth import verify_password
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+    validate_csrf(request, csrf_token)
 
     def err(msg):
         return templates.TemplateResponse(request, "profile.html", {
