@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Согласование — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Согласование постов</h4>
+    <div class="text-muted" style="font-size:.85rem;">
+      Материал #{{ item.id }} · {{ item.type }} · {{ item.created_at | moscow }} МСК
+    </div>
+  </div>
+  <a href="/content/{{ item.id }}/preview" class="btn btn-sm btn-light" style="border-radius:8px;">
+    ← Назад к черновику
+  </a>
+</div>
+
+{% if item.source_url %}
+<div class="alert alert-light border mb-3 py-2 px-3" style="font-size:.85rem;">
+  <i class="bi bi-link-45deg"></i> Источник:
+  <a href="{{ item.source_url }}" target="_blank">{{ item.source_url[:80] }}</a>
+</div>
+{% endif %}
+
+{% if image_filename %}
+<div class="stat-card mb-3">
+  <div class="fw-semibold mb-2" style="color:#1a3c5e; font-size:.9rem;">
+    <i class="bi bi-image"></i> Прикреплённое фото
+  </div>
+  <img src="/uploads/{{ image_filename }}" alt="фото"
+       style="max-height:280px; max-width:100%; border-radius:8px; object-fit:contain;">
+</div>
+{% endif %}
+
+{% if flash %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ flash }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<form method="post" action="/posts/approve/{{ item.id }}">
+
+  <!-- Посты по платформам -->
+  {% for post in posts %}
+  {% set pname = platform_names.get(post.platform, ("📄", post.platform)) %}
+  <div class="stat-card mb-3 post-card {% if post.status == 'failed' %}opacity-50{% endif %}"
+       id="card-{{ post.id }}" data-platform="{{ post.platform }}">
+
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="d-flex align-items-center gap-2">
+        {% if post.status != 'failed' %}
+        <div class="form-check mb-0">
+          <input class="form-check-input platform-check" type="checkbox"
+                 name="include_{{ post.id }}" id="chk_{{ post.id }}"
+                 value="1" checked
+                 onchange="toggleCard({{ post.id }}, this.checked)">
+        </div>
+        {% endif %}
+        <label class="fw-semibold mb-0" for="chk_{{ post.id }}"
+               style="color:#1a3c5e; font-size:.95rem; cursor:pointer;">
+          {{ pname[0] }} {{ pname[1] }}
+        </label>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="char-count text-muted" id="cc-{{ post.id }}" style="font-size:.78rem;">
+          {{ post.text | length if post.text else 0 }} симв.
+        </span>
+        {% if post.text %}
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                id="copy-{{ post.id }}" onclick="copyPostText('{{ post.id }}')"
+                title="Скопировать текст" style="font-size:.75rem; border-radius:6px;">
+          <i class="bi bi-clipboard"></i>
+        </button>
+        {% endif %}
+        {% if post.status == 'draft' %}
+          <span class="badge bg-warning text-dark">черновик</span>
+        {% elif post.status == 'failed' %}
+          <span class="badge bg-danger">ошибка</span>
+        {% elif post.status == 'approved' %}
+          <span class="badge bg-success">одобрен</span>
+        {% elif post.status == 'published' %}
+          <span class="badge bg-primary">опубликован</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if post.status == 'failed' %}
+    <div class="text-danger" style="font-size:.88rem;">
+      <i class="bi bi-exclamation-triangle"></i> Не удалось сгенерировать текст для этой платформы
+    </div>
+    {% elif post.status == 'published' %}
+    <div class="p-3 rounded" style="background:#f0fdf4; font-size:.88rem; white-space:pre-wrap; line-height:1.6; border:1px solid #bbf7d0;">{{ post.text or '' }}</div>
+    {% for pub in post.publications %}
+      {% if pub.success and pub.post_url %}
+      <div class="mt-1">
+        <a href="{{ pub.post_url }}" target="_blank" style="font-size:.8rem;">
+          <i class="bi bi-box-arrow-up-right"></i> Открыть публикацию
+        </a>
+      </div>
+      {% elif pub.error_message %}
+      <div class="text-danger mt-1" style="font-size:.8rem;">
+        <i class="bi bi-exclamation-circle"></i> {{ pub.error_message }}
+      </div>
+      {% endif %}
+    {% endfor %}
+    {% else %}
+    <textarea class="form-control post-textarea" name="text_{{ post.id }}"
+              id="ta-{{ post.id }}" rows="5"
+              style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc;"
+              oninput="updateCount({{ post.id }}, this.value)">{{ post.text or '' }}</textarea>
+    <div class="text-end mt-1">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="save-{{ post.id }}"
+              onclick="savePost({{ post.id }})" style="font-size:.78rem; border-radius:6px;">
+        <i class="bi bi-floppy"></i> Сохранить правки
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- Планирование -->
+  <div class="stat-card mb-4">
+    <div class="fw-semibold mb-3" style="color:#1a3c5e; font-size:.95rem;">
+      <i class="bi bi-clock"></i> Когда публиковать?
+    </div>
+    <div class="d-flex gap-3 flex-wrap">
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="schedule_mode"
+               id="now_radio" value="now" checked onchange="toggleSchedule(false)">
+        <label class="form-check-label" for="now_radio">Сразу после согласования</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="schedule_mode"
+               id="later_radio" value="later" onchange="toggleSchedule(true)">
+        <label class="form-check-label" for="later_radio">Запланировать на время</label>
+      </div>
+    </div>
+    <div id="schedule_block" class="mt-3" style="display:none;">
+      <input type="datetime-local" class="form-control" name="scheduled_at"
+             id="scheduled_at" style="max-width:260px;">
+      <div class="text-muted mt-1" style="font-size:.78rem;">Московское время (UTC+3)</div>
+    </div>
+  </div>
+
+  <!-- Кнопки -->
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    <button type="submit" name="action" value="approve" id="approveBtn"
+            class="btn px-4 fw-semibold"
+            style="background:#1a3c5e;color:#fff;border-radius:8px;">
+      <i class="bi bi-check2-circle"></i> Одобрить и опубликовать
+    </button>
+    <button type="submit" name="action" value="reject_all"
+            class="btn btn-outline-danger px-3" style="border-radius:8px;"
+            onclick="return confirm('Отклонить все посты?')">
+      <i class="bi bi-x-circle"></i> Отклонить всё
+    </button>
+    <a href="/dashboard" class="btn btn-light" style="border-radius:8px;">На главную</a>
+  </div>
+
+</form>
+
+<script>
+const PLATFORM_LIMITS = {
+  telegram_channel: 4096,
+  telegram_group: 4096,
+  vk_group: 4096,
+};
+const DEFAULT_LIMIT = 4096;
+
+function getLimit(postId) {
+  const card = document.getElementById('card-' + postId);
+  if (!card) return DEFAULT_LIMIT;
+  const platform = card.dataset.platform || '';
+  return PLATFORM_LIMITS[platform] || DEFAULT_LIMIT;
+}
+
+function updateCount(id, text) {
+  const limit = getLimit(id);
+  const len = text.length;
+  const pct = len / limit;
+  const el = document.getElementById('cc-' + id);
+  el.textContent = len + ' / ' + limit + ' симв.';
+  if (pct >= 0.95) {
+    el.className = 'char-count text-danger fw-semibold';
+  } else if (pct >= 0.80) {
+    el.className = 'char-count text-warning fw-semibold';
+  } else {
+    el.className = 'char-count text-muted';
+  }
+}
+
+function toggleCard(id, enabled) {
+  const ta = document.getElementById('ta-' + id);
+  const card = document.getElementById('card-' + id);
+  if (ta) ta.disabled = !enabled;
+  card.style.opacity = enabled ? '1' : '0.4';
+}
+
+function toggleSchedule(show) {
+  document.getElementById('schedule_block').style.display = show ? 'block' : 'none';
+  if (show) {
+    const d = new Date();
+    d.setHours(d.getHours() + 4); // UTC+3 + 1h ahead
+    document.getElementById('scheduled_at').value = d.toISOString().slice(0,16);
+  }
+}
+
+// Block approve button on submit to prevent double-publish
+document.querySelector('form').addEventListener('submit', function(e) {
+  const btn = document.getElementById('approveBtn');
+  if (e.submitter && e.submitter.value === 'approve') {
+    if (btn.dataset.submitting) { e.preventDefault(); return; }
+    btn.dataset.submitting = '1';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Публикуем...';
+  }
+});
+
+function savePost(id) {
+  const ta = document.getElementById('ta-' + id);
+  if (!ta) return;
+  const btn = document.getElementById('save-' + id);
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
+  const fd = new FormData();
+  fd.append('text', ta.value);
+  fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (!btn) return;
+      btn.disabled = false;
+      if (data.ok) {
+        btn.innerHTML = '<i class="bi bi-check2"></i> Сохранено';
+        btn.classList.add('btn-success'); btn.classList.remove('btn-outline-secondary');
+        setTimeout(function() {
+          btn.innerHTML = orig;
+          btn.classList.remove('btn-success'); btn.classList.add('btn-outline-secondary');
+        }, 2000);
+      } else {
+        btn.innerHTML = orig;
+      }
+    })
+    .catch(function() { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
+}
+
+// Init char counts
+document.querySelectorAll('.post-textarea').forEach(function(ta) {
+  const id = ta.id.replace('ta-', '');
+  updateCount(id, ta.value);
+});
+
+function copyPostText(id) {
+  const ta = document.getElementById('ta-' + id);
+  const pub = document.querySelector('#card-' + id + ' .p-3');
+  const text = ta ? ta.value : (pub ? pub.textContent.trim() : '');
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    const btn = document.getElementById('copy-' + id);
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check2"></i>';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-secondary');
+    setTimeout(function() {
+      btn.innerHTML = orig;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-outline-secondary');
+    }, 1500);
+  });
+}
+</script>
+{% endblock %}

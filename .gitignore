@@ -1,0 +1,28 @@
+# Окружение и секреты
+.env
+*.db
+
+# Скрипты с захардкоженными учётными данными
+deploy_sftp.py
+scripts/_fix_admin.py
+
+# Claude Code — содержит учётные данные сервера
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+/python
+
+# Загруженные файлы (хранятся на сервере, не в git)
+uploads/*
+!uploads/.gitkeep
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

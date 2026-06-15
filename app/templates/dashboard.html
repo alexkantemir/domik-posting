@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold" style="color:#1a3c5e;">Дашборд</h4>
+    <div class="text-muted" style="font-size:.85rem;">Добро пожаловать, {{ user.name }}</div>
+  </div>
+  <a href="/content/new" class="btn btn-sm" style="background:#1a3c5e;color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg"></i> Новый материал
+  </a>
+</div>
+
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+  {% if user.role != 'editor' %}
+  <div class="col-6 col-md-3">
+    <a href="/posts/pending" class="text-decoration-none">
+      <div class="stat-card" style="cursor:pointer; transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-value">{{ stats.pending }}</div>
+            <div class="stat-label">На согласовании</div>
+          </div>
+          <div class="stat-icon">⏳</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  <div class="col-6 col-md-3">
+    <a href="/posts/scheduled" class="text-decoration-none">
+      <div class="stat-card" style="cursor:pointer; transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-value">{{ stats.scheduled }}</div>
+            <div class="stat-label">Запланировано</div>
+          </div>
+          <div class="stat-icon">🕐</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="/posts/history" class="text-decoration-none">
+      <div class="stat-card" style="cursor:pointer; transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-value">{{ stats.published_total }}</div>
+            <div class="stat-label">Опубликовано</div>
+          </div>
+          <div class="stat-icon">✅</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-value">{{ stats.content_total }}</div>
+          <div class="stat-label">Материалов</div>
+        </div>
+        <div class="stat-icon">📥</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Подключённые платформы -->
+<div class="stat-card mb-4">
+  <div class="fw-semibold mb-3" style="color:#1a3c5e; font-size:.95rem;">
+    <i class="bi bi-broadcast"></i> Платформы
+  </div>
+  <div class="row g-2">
+    {% for p in all_publishers %}
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="d-flex align-items-center gap-2 py-1">
+        <span class="platform-dot {% if p.is_configured() %}dot-active{% else %}dot-inactive{% endif %}"></span>
+        <span style="font-size:.88rem; color: {% if p.is_configured() %}#222{% else %}#aaa{% endif %};">
+          {{ p.icon }} {{ p.platform_name }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="mt-2" style="font-size:.78rem; color:#aaa;">
+    Зелёный — подключено и настроено. Серый — появится позже.
+  </div>
+</div>
+
+<!-- Последние материалы -->
+<div class="stat-card">
+  <div class="fw-semibold mb-3" style="color:#1a3c5e; font-size:.95rem;">
+    <i class="bi bi-clock-history"></i> Последние материалы
+  </div>
+  {% if recent %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" style="font-size:.88rem;">
+      <thead>
+        <tr class="text-muted">
+          <th>Тип</th>
+          <th>Содержимое</th>
+          <th>Кто загрузил</th>
+          <th>Дата</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in recent %}
+        {% set st = item_statuses.get(item.id, 'unknown') %}
+        <tr style="cursor:pointer;" onclick="location.href='{% if st == 'pending' and user.role == 'approver' %}/posts/approve/{{ item.id }}{% else %}/content/{{ item.id }}/preview{% endif %}'">
+          <td>
+            {% if item.type == 'text' %}📝
+            {% elif item.type == 'url' %}🔗
+            {% elif item.type == 'photo' %}📷
+            {% elif item.type == 'video' %}🎥
+            {% elif item.type == 'audio' %}🎤
+            {% elif item.type == 'photo_text' %}📷+📝
+            {% else %}📄{% endif %}
+            <span class="text-muted">{{ item.type }}</span>
+          </td>
+          <td>
+            {% if item.raw_text %}
+              {{ item.raw_text[:80] }}{% if item.raw_text|length > 80 %}…{% endif %}
+            {% elif item.source_url %}
+              <span class="text-muted">{{ item.source_url[:60] }}…</span>
+            {% else %}
+              <span class="text-muted">файл</span>
+            {% endif %}
+          </td>
+          <td>{{ item.author.name if item.author else '—' }}</td>
+          <td class="text-muted">{{ item.created_at | moscow }}</td>
+          <td>
+            {% if st == 'pending' %}
+              <span class="badge bg-warning text-dark">На согласовании</span>
+            {% elif st == 'scheduled' %}
+              <span class="badge bg-info text-dark">Запланировано</span>
+            {% elif st == 'published' %}
+              <span class="badge bg-success">Опубликован</span>
+            {% elif st == 'rejected' %}
+              <span class="badge bg-secondary">Отклонён</span>
+            {% else %}
+              <span class="badge bg-light text-dark">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4" style="font-size:.9rem;">
+    Материалов пока нет.<br>
+    <a href="/content/new">Загрузите первый материал →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

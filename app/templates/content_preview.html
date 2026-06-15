@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Черновики постов — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Сгенерированные черновики</h4>
+    <div class="text-muted" style="font-size:.85rem;">
+      Материал #{{ item.id }} · {{ item.type }} · {{ item.created_at | moscow }} МСК
+    </div>
+  </div>
+  <a href="/content/new" class="btn btn-sm" style="background:#1a3c5e;color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg"></i> Новый материал
+  </a>
+</div>
+
+{% if item.source_url %}
+<div class="alert alert-light border mb-4 py-2 px-3" style="font-size:.85rem;">
+  <i class="bi bi-link-45deg"></i> Источник:
+  <a href="{{ item.source_url }}" target="_blank">{{ item.source_url[:80] }}</a>
+</div>
+{% endif %}
+
+{% if image_filename %}
+<div class="stat-card mb-4">
+  <div class="fw-semibold mb-2" style="color:#1a3c5e; font-size:.9rem;">
+    <i class="bi bi-image"></i> Прикреплённое фото
+  </div>
+  <img src="/uploads/{{ image_filename }}" alt="фото"
+       style="max-height:320px; max-width:100%; border-radius:8px; object-fit:contain;">
+</div>
+{% endif %}
+
+{% for post in posts %}
+{% set pname = platform_names.get(post.platform, ("📄", post.platform)) %}
+<div class="stat-card mb-3">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="fw-semibold" style="color:#1a3c5e; font-size:.95rem;">
+      {{ pname[0] }} {{ pname[1] }}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if post.text %}
+      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+              id="copy-{{ post.id }}" onclick="copyPostText('{{ post.id }}')"
+              title="Скопировать текст" style="font-size:.75rem; border-radius:6px;">
+        <i class="bi bi-clipboard"></i>
+      </button>
+      {% endif %}
+      {% if post.status == 'draft' %}
+        <span class="badge bg-warning text-dark">черновик</span>
+      {% elif post.status == 'failed' %}
+        <span class="badge bg-danger">ошибка генерации</span>
+      {% elif post.status == 'approved' %}
+        <span class="badge bg-success">одобрен</span>
+      {% elif post.status == 'published' %}
+        <span class="badge bg-primary">опубликован</span>
+      {% endif %}
+      <span class="text-muted" style="font-size:.78rem;">
+        {{ post.text | length if post.text else 0 }} симв.
+      </span>
+    </div>
+  </div>
+
+  {% if post.status == 'draft' and post.text %}
+  <textarea class="form-control" id="ta-{{ post.id }}" rows="5"
+            style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc; white-space:pre-wrap;"
+            oninput="previewUpdateCount({{ post.id }}, this.value)">{{ post.text }}</textarea>
+  <div class="d-flex justify-content-between align-items-center mt-2">
+    <span class="text-muted" id="cc-prev-{{ post.id }}" style="font-size:.78rem;">{{ post.text | length }} симв.</span>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="save-{{ post.id }}"
+            onclick="savePost({{ post.id }})" style="border-radius:6px; font-size:.82rem;">
+      <i class="bi bi-floppy"></i> Сохранить черновик
+    </button>
+  </div>
+  {% elif post.status == 'published' and post.text %}
+  <div id="text-{{ post.id }}" class="p-3 rounded" style="background:#f0fdf4; font-size:.9rem; white-space:pre-wrap; line-height:1.6; border:1px solid #bbf7d0;">{{ post.text }}</div>
+  {% elif post.text %}
+  <div id="text-{{ post.id }}" class="p-3 rounded" style="background:#f8fafc; font-size:.9rem; white-space:pre-wrap; line-height:1.6; border:1px solid #e8edf3;">{{ post.text }}</div>
+  {% else %}
+  <div class="text-danger" style="font-size:.88rem;">
+    <i class="bi bi-exclamation-triangle"></i> Не удалось сгенерировать
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if not posts %}
+<div class="stat-card text-center text-muted py-5">
+  Посты ещё не сгенерированы
+</div>
+{% endif %}
+
+<div class="mt-4 d-flex gap-2 flex-wrap">
+  {% if user.role != 'editor' %}
+  <a href="/posts/approve/{{ item.id }}"
+     class="btn px-4 fw-semibold"
+     style="background:#1a3c5e;color:#fff;border-radius:8px;">
+    Перейти к согласованию →
+  </a>
+  {% endif %}
+  <a href="/dashboard" class="btn btn-light" style="border-radius:8px;">На главную</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyPostText(id) {
+  const ta = document.getElementById('ta-' + id);
+  const el = document.getElementById('text-' + id);
+  const text = ta ? ta.value.trim() : (el ? el.textContent.trim() : '');
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    const btn = document.getElementById('copy-' + id);
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check2"></i>';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-secondary');
+    setTimeout(function() {
+      btn.innerHTML = orig;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-outline-secondary');
+    }, 1500);
+  });
+}
+
+function previewUpdateCount(id, text) {
+  const el = document.getElementById('cc-prev-' + id);
+  if (el) el.textContent = text.length + ' симв.';
+}
+
+function savePost(id) {
+  const ta = document.getElementById('ta-' + id);
+  if (!ta) return;
+  const btn = document.getElementById('save-' + id);
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
+  const fd = new FormData();
+  fd.append('text', ta.value);
+  fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (!btn) return;
+      btn.disabled = false;
+      if (data.ok) {
+        btn.innerHTML = '<i class="bi bi-check2"></i> Сохранено';
+        btn.classList.add('btn-success'); btn.classList.remove('btn-outline-primary');
+        setTimeout(function() {
+          btn.innerHTML = orig;
+          btn.classList.remove('btn-success'); btn.classList.add('btn-outline-primary');
+        }, 2000);
+      } else {
+        btn.innerHTML = orig;
+      }
+    })
+    .catch(function() { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
+}
+</script>
+{% endblock %}

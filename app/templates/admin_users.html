@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Пользователи</h4>
+    <div class="text-muted" style="font-size:.85rem;">Управление доступом</div>
+  </div>
+  <a href="/admin/users/new" class="btn btn-sm fw-semibold"
+     style="background:#1a3c5e;color:#fff;border-radius:8px;">
+    <i class="bi bi-person-plus"></i> Добавить
+  </a>
+</div>
+
+{% if flash %}
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-check2-circle"></i> {{ flash }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="stat-card">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" style="font-size:.88rem;">
+      <thead>
+        <tr class="text-muted">
+          <th>#</th>
+          <th>Имя</th>
+          <th>Email</th>
+          <th>Роль</th>
+          <th>Статус</th>
+          <th>Зарегистрирован</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr {% if not u.active %}style="opacity:.5;"{% endif %}>
+          <td class="text-muted">{{ u.id }}</td>
+          <td class="fw-semibold">{{ u.name }}</td>
+          <td class="text-muted">{{ u.email }}</td>
+          <td>
+            {% if u.role == 'admin' %}
+              <span class="badge bg-danger">Администратор</span>
+            {% elif u.role == 'approver' %}
+              <span class="badge bg-primary">Согласующий</span>
+            {% else %}
+              <span class="badge bg-secondary">Редактор</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.active %}
+              <span class="badge bg-success">Активен</span>
+            {% else %}
+              <span class="badge bg-light text-dark">Неактивен</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ u.created_at | moscow }}</td>
+          <td class="text-end" onclick="event.stopPropagation()">
+            <a href="/admin/users/{{ u.id }}/edit"
+               class="btn btn-sm btn-outline-secondary me-1" style="border-radius:6px;">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if u.id != user.id %}
+            <form method="post" action="/admin/users/{{ u.id }}/toggle" class="d-inline">
+              <button type="submit" class="btn btn-sm {% if u.active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                      style="border-radius:6px;"
+                      onclick="return confirm('{% if u.active %}Деактивировать{% else %}Активировать{% endif %} пользователя {{ u.name }}?')">
+                <i class="bi {% if u.active %}bi-person-slash{% else %}bi-person-check{% endif %}"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3" style="font-size:.8rem; color:#aaa;">
+  <i class="bi bi-info-circle"></i>
+  Роли: <strong>Редактор</strong> — создаёт материалы &nbsp;·&nbsp;
+  <strong>Согласующий</strong> — создаёт и одобряет &nbsp;·&nbsp;
+  <strong>Администратор</strong> — полный доступ + управление пользователями
+</div>
+{% endblock %}

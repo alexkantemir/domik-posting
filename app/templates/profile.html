@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль — Домик{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Мой профиль</h4>
+  <div class="text-muted" style="font-size:.85rem;">{{ user.email }}</div>
+</div>
+
+{% if flash %}
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-check2-circle"></i> {{ flash }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.9rem;">
+  <i class="bi bi-exclamation-circle"></i> {{ error }}
+</div>
+{% endif %}
+
+<div class="stat-card mb-3" style="max-width:480px;">
+  <div class="fw-semibold mb-3" style="color:#1a3c5e; font-size:.95rem;">
+    <i class="bi bi-person-circle"></i> Данные аккаунта
+  </div>
+  <div class="mb-2" style="font-size:.9rem;">
+    <span class="text-muted">Имя:</span> {{ user.name }}
+  </div>
+  <div class="mb-2" style="font-size:.9rem;">
+    <span class="text-muted">Email:</span> {{ user.email }}
+  </div>
+  <div style="font-size:.9rem;">
+    <span class="text-muted">Роль:</span>
+    {% if user.role == 'admin' %}
+      <span class="badge bg-danger">Администратор</span>
+    {% elif user.role == 'approver' %}
+      <span class="badge bg-primary">Согласующий</span>
+    {% else %}
+      <span class="badge bg-secondary">Редактор</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stat-card" style="max-width:480px;">
+  <div class="fw-semibold mb-3" style="color:#1a3c5e; font-size:.95rem;">
+    <i class="bi bi-key"></i> Изменить пароль
+  </div>
+  <form method="post" action="/admin/profile">
+    <div class="mb-3">
+      <label class="form-label" style="font-size:.88rem; font-weight:500;">Текущий пароль</label>
+      <input type="password" name="password_old" class="form-control" required
+             autocomplete="current-password">
+    </div>
+    <div class="mb-3">
+      <label class="form-label" style="font-size:.88rem; font-weight:500;">Новый пароль</label>
+      <input type="password" name="password_new" class="form-control" required
+             placeholder="Минимум 6 символов" autocomplete="new-password">
+    </div>
+    <div class="mb-4">
+      <label class="form-label" style="font-size:.88rem; font-weight:500;">Повторите новый пароль</label>
+      <input type="password" name="password_new2" class="form-control" required
+             autocomplete="new-password">
+    </div>
+    <button type="submit" class="btn fw-semibold px-4"
+            style="background:#1a3c5e;color:#fff;border-radius:8px;">
+      <i class="bi bi-check2"></i> Сохранить пароль
+    </button>
+  </form>
+</div>
+{% endblock %}

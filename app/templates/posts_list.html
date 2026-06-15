@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">{{ page_title }}</h4>
+    <div class="text-muted" style="font-size:.85rem;">{{ items | length }} материалов</div>
+  </div>
+  <a href="/content/new" class="btn btn-sm" style="background:#1a3c5e;color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg"></i> Новый материал
+  </a>
+</div>
+
+{% if flash %}
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-check2-circle"></i> {{ flash }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if items %}
+{% for item in items %}
+<div class="stat-card mb-3" style="cursor:pointer;"
+     onclick="location.href='{% if page_type == 'pending' and user.role == 'approver' %}/posts/approve/{{ item.id }}{% else %}/content/{{ item.id }}/preview{% endif %}'">
+
+  <div class="d-flex align-items-start justify-content-between mb-2">
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:.8rem; color:#888; margin-bottom:.25rem;">
+        #{{ item.id }} · {{ item.type }} · {{ item.created_at | moscow }} МСК
+        {% if item.author %} · {{ item.author.name }}{% endif %}
+      </div>
+      <div style="font-size:.9rem; color:#333;">
+        {% if item.raw_text %}
+          {{ item.raw_text[:120] }}{% if item.raw_text | length > 120 %}…{% endif %}
+        {% elif item.source_url %}
+          <span class="text-muted"><i class="bi bi-link-45deg"></i> {{ item.source_url[:80] }}</span>
+        {% else %}
+          <span class="text-muted">файл</span>
+        {% endif %}
+      </div>
+
+      {% if page_type == 'scheduled' %}
+        {% set ns = namespace(scheduled_at=None) %}
+        {% for post in item.generated_posts %}
+          {% if post.status == 'approved' and post.scheduled_at and not ns.scheduled_at %}
+            {% set ns.scheduled_at = post.scheduled_at %}
+          {% endif %}
+        {% endfor %}
+        {% if ns.scheduled_at %}
+        <div class="mt-2 d-inline-flex align-items-center gap-2 px-3 py-1 rounded"
+             style="background:#e0f2fe; color:#0369a1; font-size:.85rem; font-weight:500;">
+          <i class="bi bi-calendar-check"></i> Публикация: {{ ns.scheduled_at | moscow }} МСК
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="ms-3 flex-shrink-0" onclick="event.stopPropagation()">
+      {% if page_type == 'pending' %}
+        {% if user.role == 'approver' %}
+        <a href="/posts/approve/{{ item.id }}" class="btn btn-sm fw-semibold"
+           style="background:#1a3c5e;color:#fff;border-radius:6px;">
+          <i class="bi bi-check2-circle"></i> Согласовать
+        </a>
+        {% else %}
+        <a href="/content/{{ item.id }}/preview" class="btn btn-sm btn-outline-secondary"
+           style="border-radius:6px;">
+          <i class="bi bi-eye"></i> Просмотр
+        </a>
+        {% endif %}
+      {% else %}
+        <a href="/content/{{ item.id }}/preview" class="btn btn-sm btn-light"
+           style="border-radius:6px;">
+          <i class="bi bi-eye"></i> Просмотр
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Статусы платформ -->
+  <div class="d-flex gap-2 flex-wrap mt-2">
+    {% for post in item.generated_posts %}
+    {% set pname = platform_names.get(post.platform, ("📄", post.platform)) %}
+    <span class="badge
+      {% if post.status == 'published' %}bg-success
+      {% elif post.status == 'approved' %}bg-info text-dark
+      {% elif post.status == 'draft' %}bg-warning text-dark
+      {% elif post.status == 'rejected' %}bg-secondary
+      {% elif post.status == 'failed' %}bg-danger
+      {% else %}bg-light text-dark{% endif %}"
+      style="font-size:.72rem; font-weight:500;">
+      {{ pname[0] }} {{ pname[1] }}
+    </span>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="stat-card text-center py-5 text-muted">
+  <i class="bi bi-inbox" style="font-size:2rem; opacity:.3;"></i>
+  <div class="mt-2">{{ empty_text }}</div>
+</div>
+{% endif %}
+{% endblock %}

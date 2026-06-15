@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Новый материал — Домик{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Новый материал</h4>
+  <div class="text-muted" style="font-size:.85rem;">Загрузите материал — система сгенерирует посты для каждой соцсети</div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.9rem;">
+  <i class="bi bi-exclamation-circle"></i> {{ error }}
+</div>
+{% endif %}
+
+<div class="stat-card">
+  <form method="post" action="/content/new" enctype="multipart/form-data" id="uploadForm">
+
+    <!-- Тип материала -->
+    <div class="mb-4">
+      <label class="form-label fw-semibold" style="color:#1a3c5e;">Тип материала</label>
+      <div class="d-flex flex-wrap gap-2" id="typeButtons">
+        {% set types = [
+          ("text",       "📝", "Текст"),
+          ("url",        "🔗", "Ссылка"),
+          ("photo",      "📷", "Фото"),
+          ("photo_text", "📷+📝", "Фото + текст"),
+          ("video",      "🎥", "Видео"),
+          ("audio",      "🎤", "Аудио"),
+        ] %}
+        {% for val, icon, label in types %}
+        <input type="radio" class="btn-check" name="content_type" id="type_{{ val }}"
+               value="{{ val }}" {% if val == 'text' %}checked{% endif %} autocomplete="off">
+        <label class="btn btn-outline-secondary btn-sm" for="type_{{ val }}" style="border-radius:20px;">
+          {{ icon }} {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Поле: текст -->
+    <div id="field_text" class="mb-3">
+      <label class="form-label fw-semibold" style="color:#1a3c5e;">Текст материала</label>
+      <textarea name="text" class="form-control" rows="6"
+        placeholder="Вставьте текст статьи, новости или заметки..."></textarea>
+      <div class="form-text">Чем подробнее текст — тем лучше получатся посты</div>
+    </div>
+
+    <!-- Поле: URL -->
+    <div id="field_url" class="mb-3" style="display:none;">
+      <label class="form-label fw-semibold" style="color:#1a3c5e;">Ссылка на страницу</label>
+      <input type="url" name="url" class="form-control"
+        placeholder="https://example.com/article">
+      <div class="form-text">Система автоматически извлечёт текст со страницы</div>
+    </div>
+
+    <!-- Поле: файл -->
+    <div id="field_file" class="mb-3" style="display:none;">
+      <label class="form-label fw-semibold" style="color:#1a3c5e;" id="fileLabel">Файл</label>
+      <input type="file" name="file" class="form-control" id="fileInput" accept="*/*">
+    </div>
+
+    <!-- Поле: текст для фото+текст -->
+    <div id="field_caption" class="mb-3" style="display:none;">
+      <label class="form-label fw-semibold" style="color:#1a3c5e;">Описание / подпись к фото</label>
+      <textarea name="caption" class="form-control" rows="4"
+        placeholder="Опишите что происходит на фото — это поможет ИИ написать хороший пост..."></textarea>
+    </div>
+
+    <!-- Подсказка для аудио -->
+    <div id="hint_audio" class="alert alert-info py-2 px-3 mb-3" style="display:none;font-size:.88rem;">
+      <i class="bi bi-info-circle"></i>
+      Загрузите аудиофайл (MP3, OGG, M4A, WAV). Система автоматически расшифрует речь в текст.
+      <br><em>Голосовое сообщение с телефона: запишите голосовое → сохраните как файл → загрузите.</em>
+    </div>
+
+    <hr class="my-4">
+
+    <button type="submit" class="btn px-4" id="submitBtn"
+            style="background:#1a3c5e;color:#fff;border-radius:8px;font-weight:600;">
+      <i class="bi bi-magic"></i> Сгенерировать посты
+    </button>
+    <a href="/dashboard" class="btn btn-light ms-2" style="border-radius:8px;">Отмена</a>
+
+    <div id="loadingMsg" class="mt-3 text-muted" style="display:none; font-size:.9rem;">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      Отправляем в GigaChat, генерируем посты... обычно 10–20 секунд
+    </div>
+    <div id="formError" class="alert alert-danger py-2 px-3 mt-3 d-none" style="font-size:.9rem;">
+      <i class="bi bi-exclamation-circle"></i> <span id="formErrorText"></span>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const typeFields = {
+  text:       { show: ["field_text"],              hide: ["field_url","field_file","field_caption","hint_audio"] },
+  url:        { show: ["field_url"],               hide: ["field_text","field_file","field_caption","hint_audio"] },
+  photo:      { show: ["field_file"],              hide: ["field_text","field_url","field_caption","hint_audio"] },
+  photo_text: { show: ["field_file","field_caption"], hide: ["field_text","field_url","hint_audio"] },
+  video:      { show: ["field_file"],              hide: ["field_text","field_url","field_caption","hint_audio"] },
+  audio:      { show: ["field_file","hint_audio"], hide: ["field_text","field_url","field_caption"] },
+};
+
+const fileAccept = {
+  photo: "image/*", photo_text: "image/*",
+  video: "video/*", audio: "audio/*", url: "*/*", text: "*/*",
+};
+const fileLabels = {
+  photo: "Фотография", photo_text: "Фотография",
+  video: "Видеофайл", audio: "Аудиофайл (MP3, OGG, WAV, M4A)",
+};
+
+function switchType(val) {
+  const cfg = typeFields[val] || typeFields.text;
+  cfg.show.forEach(id => document.getElementById(id).style.display = "");
+  cfg.hide.forEach(id => document.getElementById(id).style.display = "none");
+  const fi = document.getElementById("fileInput");
+  if (fi) fi.accept = fileAccept[val] || "*/*";
+  const fl = document.getElementById("fileLabel");
+  if (fl) fl.textContent = fileLabels[val] || "Файл";
+}
+
+document.querySelectorAll('input[name="content_type"]').forEach(r => {
+  r.addEventListener("change", () => switchType(r.value));
+});
+switchType("text");
+
+function showFormError(msg) {
+  const el = document.getElementById("formError");
+  document.getElementById("formErrorText").textContent = msg;
+  el.classList.remove("d-none");
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+document.getElementById("uploadForm").addEventListener("submit", function(e) {
+  document.getElementById("formError").classList.add("d-none");
+  const type = document.querySelector('input[name="content_type"]:checked').value;
+  if (type === "text") {
+    const txt = document.querySelector('textarea[name="text"]').value.trim();
+    if (!txt) { showFormError("Введите текст материала"); e.preventDefault(); return; }
+    if (txt.length < 20) { showFormError("Текст слишком короткий (минимум 20 символов)"); e.preventDefault(); return; }
+  }
+  if (type === "url") {
+    const url = document.querySelector('input[name="url"]').value.trim();
+    if (!url) { showFormError("Введите ссылку"); e.preventDefault(); return; }
+    try { new URL(url); } catch(_) { showFormError("Некорректная ссылка"); e.preventDefault(); return; }
+  }
+  if (["photo","photo_text","video","audio"].includes(type)) {
+    const fi = document.getElementById("fileInput");
+    if (!fi.files || fi.files.length === 0) { showFormError("Выберите файл"); e.preventDefault(); return; }
+  }
+  document.getElementById("submitBtn").disabled = true;
+  document.getElementById("submitBtn").innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Генерируем...';
+  document.getElementById("loadingMsg").style.display = "";
+});
+</script>
+{% endblock %}
