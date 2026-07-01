@@ -1,8 +1,10 @@
 import json
 import logging
+import time
 from datetime import datetime, timezone
 
 from app.database import SessionLocal
+from app.event_log import log_event
 from app.models import ContentItem, GeneratedPost, Publication
 from app.services.publishers.registry import get_publisher
 
@@ -40,7 +42,9 @@ def publish_scheduled_posts() -> None:
                 continue
 
             try:
+                t0 = time.monotonic()
                 result = publisher.publish(post.text or "", image_path=image_path)
+                duration_ms = int((time.monotonic() - t0) * 1000)
                 pub = Publication(
                     generated_post_id=post.id,
                     platform=post.platform,
@@ -53,12 +57,30 @@ def publish_scheduled_posts() -> None:
                 db.add(pub)
                 post.status = "published" if result.success else "failed"
                 db.commit()
+                log_event("publish",
+                    trigger="scheduled",
+                    post_id=post.id,
+                    item_id=post.content_item_id,
+                    platform=post.platform,
+                    status="success" if result.success else "fail",
+                    duration_ms=duration_ms,
+                    post_url=result.post_url,
+                    error=result.error_message[:300] if result.error_message else None,
+                )
                 logger.info(
                     "Scheduler: post %d → %s success=%s url=%s",
                     post.id, post.platform, result.success, result.post_url,
                 )
             except Exception:
                 logger.exception("Scheduler: unhandled error publishing post %d", post.id)
+                log_event("publish",
+                    trigger="scheduled",
+                    post_id=post.id,
+                    item_id=post.content_item_id,
+                    platform=post.platform,
+                    status="fail",
+                    error="unhandled_exception",
+                )
                 post.status = "failed"
                 db.commit()
     finally:

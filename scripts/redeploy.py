@@ -25,6 +25,7 @@ UPLOAD_FILES = [
     "app/database.py",
     "app/models.py",
     "app/auth.py",
+    "app/event_log.py",
     "app/routers/__init__.py",
     "app/routers/auth.py",
     "app/routers/dashboard.py",
@@ -51,9 +52,18 @@ UPLOAD_FILES = [
     "app/templates/posts_list.html",
     "app/templates/admin_users.html",
     "app/templates/admin_user_form.html",
+    "app/templates/admin_prompts.html",
+    "app/templates/admin_prompt_edit.html",
     "app/templates/profile.html",
+    "static/base.js",
+    "static/approve.js",
+    "static/preview.js",
+    "static/content_new.js",
+    "static/prompt_edit.js",
     "scripts/init_db.py",
+    "scripts/view_logs.py",
     "requirements.txt",
+    "docker-compose.yml",
 ]
 
 

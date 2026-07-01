@@ -1,5 +1,8 @@
+import time
+
 from sqlalchemy.orm import Session
 
+from app.event_log import log_event
 from app.services.content_processor import NormalizedContent
 from app.services.gigachat import generate_text
 from app.services.prompts import PLATFORM_PROMPTS
@@ -44,17 +47,26 @@ def generate_posts(content: NormalizedContent, db: Session) -> dict:
         error = None
         ok = False
         for attempt in range(2):
+            t0 = time.monotonic()
             try:
                 text = generate_text(system_prompt, user_message)
+                duration_ms = int((time.monotonic() - t0) * 1000)
                 if _is_refusal(text):
+                    log_event("gigachat_call", platform=platform, attempt=attempt + 1,
+                              status="refusal", duration_ms=duration_ms)
                     error = "GigaChat отказал (фильтр). Попробуйте переформулировать материал."
                     text = ""
                     continue
+                log_event("gigachat_call", platform=platform, attempt=attempt + 1,
+                          status="ok", duration_ms=duration_ms)
                 ok = True
                 error = None
                 break
             except Exception as e:
+                duration_ms = int((time.monotonic() - t0) * 1000)
                 error = str(e)
+                log_event("gigachat_call", platform=platform, attempt=attempt + 1,
+                          status="error", duration_ms=duration_ms, error=str(e)[:300])
         results[platform] = {"text": text, "ok": ok, "error": error}
 
     return results

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, hash_password
 from app.csrf import validate_csrf
 from app.database import get_db
+from app.event_log import log_event, mask_email
 from app.jinja import templates
 from app.models import PromptTemplate, User
 
@@ -92,6 +93,7 @@ async def user_new_submit(
     )
     db.add(new_user)
     db.commit()
+    log_event("user_create", admin_id=user.id, target_email=mask_email(new_user.email), role=new_user.role)
     request.session["flash"] = f"Пользователь {new_user.name} создан."
     return RedirectResponse(url="/admin/users", status_code=302)
 
@@ -150,6 +152,11 @@ async def user_edit_submit(
             "error": "Email уже занят другим пользователем",
         })
 
+    changed = []
+    if target.name != name.strip(): changed.append("name")
+    if target.email != email.lower().strip(): changed.append("email")
+    if target.role != role: changed.append("role")
+
     target.name = name.strip()
     target.email = email.lower().strip()
     target.role = role
@@ -161,8 +168,10 @@ async def user_edit_submit(
                 "error": "Пароль должен быть не менее 12 символов",
             })
         target.password_hash = hash_password(password)
+        changed.append("password")
 
     db.commit()
+    log_event("user_update", admin_id=user.id, target_id=target.id, fields_changed=changed or None)
     request.session["flash"] = f"Данные пользователя {target.name} обновлены."
     return RedirectResponse(url="/admin/users", status_code=302)
 
@@ -183,6 +192,7 @@ async def user_toggle(user_id: int, request: Request, db: Session = Depends(get_
     if target:
         target.active = not target.active
         db.commit()
+        log_event("user_toggle", admin_id=user.id, target_id=target.id, active=target.active)
         state = "активирован" if target.active else "деактивирован"
         request.session["flash"] = f"Пользователь {target.name} {state}."
     return RedirectResponse(url="/admin/users", status_code=302)
@@ -245,6 +255,7 @@ async def prompt_edit_submit(
     prompt.updated_by = user.id
     db.commit()
 
+    log_event("prompt_update", user_id=user.id, platform_id=platform_id)
     request.session["flash"] = f"Промпт для «{prompt.platform_name}» сохранён."
     return RedirectResponse(url="/admin/prompts", status_code=302)
 
@@ -265,6 +276,7 @@ async def prompt_reset(platform_id: str, request: Request, db: Session = Depends
         prompt.updated_at = datetime.now(timezone.utc)
         prompt.updated_by = user.id
         db.commit()
+        log_event("prompt_reset", user_id=user.id, platform_id=platform_id)
         request.session["flash"] = f"Промпт для «{prompt.platform_name}» сброшен к значению по умолчанию."
     return RedirectResponse(url="/admin/prompts", status_code=302)
 

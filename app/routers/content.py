@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.csrf import validate_csrf
 from app.database import get_db
+from app.event_log import log_event
 from app.jinja import templates
 from app.models import ContentItem, GeneratedPost, Publication
 from app.services.content_processor import NormalizedContent, process_url
@@ -155,6 +157,13 @@ def content_new_submit(
     db.commit()
     db.refresh(item)
 
+    log_event("content_create",
+        user_id=user.id,
+        content_type=content_type,
+        has_file=bool(file_paths),
+        text_len=len(normalized.text) if normalized.text else 0,
+    )
+
     # Генерируем посты через GigaChat
     try:
         generated = generate_posts(normalized, db)
@@ -294,6 +303,7 @@ async def approve_submit(
             if post.status not in ("published",):
                 post.status = "rejected"
         db.commit()
+        log_event("reject_all", user_id=user.id, item_id=item_id)
         request.session["flash"] = "Материал отклонён."
         return RedirectResponse(url="/posts/pending", status_code=302)
 
@@ -333,6 +343,14 @@ async def approve_submit(
 
     db.commit()
 
+    log_event("approve",
+        user_id=user.id,
+        item_id=item_id,
+        approved=approved_count,
+        schedule_mode=schedule_mode,
+        scheduled_at=scheduled_at.isoformat() if schedule_mode == "later" else None,
+    )
+
     # Публикуем немедленно если выбран режим "сразу"
     published_count = 0
     failed_count = 0
@@ -347,7 +365,20 @@ async def approve_submit(
             if not publisher or not publisher.is_configured():
                 continue
 
+            t0 = time.monotonic()
             result = publisher.publish(post.text or "", image_path=image_path)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+
+            log_event("publish",
+                trigger="manual",
+                post_id=post.id,
+                item_id=item.id,
+                platform=post.platform,
+                status="success" if result.success else "fail",
+                duration_ms=duration_ms,
+                post_url=result.post_url,
+                error=result.error_message[:300] if result.error_message else None,
+            )
 
             pub = Publication(
                 generated_post_id=post.id,

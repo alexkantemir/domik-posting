@@ -3,7 +3,8 @@
 *.db
 
 # Внутренние отчёты аудита (не для публичного репо)
-docs/
+docs/audit-*.md
+docs/production-switch.md
 
 # Скрипты с захардкоженными учётными данными или временные
 deploy_sftp.py
@@ -33,6 +34,9 @@ venv/
 # Загруженные файлы (хранятся на сервере, не в git)
 uploads/*
 !uploads/.gitkeep
+
+# Логи (хранятся на сервере, не в git)
+logs/*.jsonl
 
 # OS / IDE
 .DS_Store
