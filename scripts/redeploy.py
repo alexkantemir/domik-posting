@@ -143,7 +143,11 @@ def main():
     sftp.close()
     print("✅ Файлы загружены\n")
 
-    print("2. Пересобираем и перезапускаем app...")
+    print("2. Проверяем права на volume-директории...")
+    run(ssh, f"mkdir -p {PROJECT_DIR}/logs {PROJECT_DIR}/uploads && chown 999:999 {PROJECT_DIR}/logs {PROJECT_DIR}/uploads", check=False)
+    print("✅ Права выставлены\n")
+
+    print("3. Пересобираем и перезапускаем app...")
     run(ssh, f"cd {PROJECT_DIR} && docker compose up -d --build --force-recreate app", timeout=300)
     print("✅ Готово\n")
 

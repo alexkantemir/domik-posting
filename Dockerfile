@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
 
 # Непривилегированный пользователь
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
-RUN mkdir -p uploads static && chown -R appuser:appuser /app
+RUN mkdir -p uploads static logs && chown -R appuser:appuser /app
 
 COPY --chown=appuser:appuser . .
 
