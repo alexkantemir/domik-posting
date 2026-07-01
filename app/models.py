@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
@@ -15,7 +15,7 @@ class User(Base):
     password_hash = Column(String(200), nullable=False)
     role = Column(String(20), nullable=False)  # editor | approver
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     content_items = relationship("ContentItem", back_populates="author", foreign_keys="ContentItem.created_by")
 
@@ -30,7 +30,7 @@ class ContentItem(Base):
     file_paths = Column(Text)   # JSON-строка со списком путей
     source_url = Column(String(500))
     created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     author = relationship("User", back_populates="content_items", foreign_keys=[created_by])
     generated_posts = relationship("GeneratedPost", back_populates="content_item")
@@ -51,11 +51,24 @@ class GeneratedPost(Base):
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     scheduled_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     content_item = relationship("ContentItem", back_populates="generated_posts")
     approver = relationship("User", foreign_keys=[approved_by])
     publications = relationship("Publication", back_populates="generated_post")
+
+
+class PromptTemplate(Base):
+    __tablename__ = "prompt_templates"
+
+    id = Column(Integer, primary_key=True)
+    platform_id = Column(String(30), unique=True, nullable=False)
+    platform_name = Column(String(50), nullable=False)
+    prompt = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    editor = relationship("User", foreign_keys=[updated_by])
 
 
 class Publication(Base):

@@ -23,6 +23,24 @@ _BLOCKED_HOSTS = {
     "metadata.google.internal",  # GCP metadata
     "app", "db", "nginx",        # docker service names
 }
+_BLOCKED_CIDRS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),  # CGNAT
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),        # IPv6 ULA
+]
+
+
+def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return (
+        ip.is_private or ip.is_loopback or ip.is_link_local
+        or ip.is_reserved or ip.is_multicast
+        or any(ip in net for net in _BLOCKED_CIDRS)
+    )
 
 
 def _validate_url(url: str) -> None:
@@ -41,32 +59,49 @@ def _validate_url(url: str) -> None:
     if host in _BLOCKED_HOSTS:
         raise ValueError("Недопустимый хост")
 
-    # Резолвим DNS и проверяем IP
+    # Резолвим все A/AAAA записи и проверяем каждый IP (защита от DNS rebinding)
     try:
         ip = ipaddress.ip_address(host)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        if _is_blocked_ip(ip):
             raise ValueError("Приватный или зарезервированный IP недопустим")
     except ValueError as e:
-        if any(w in str(e) for w in ("Приватный", "Недопустимый")):
+        if "Приватный" in str(e) or "Недопустимый" in str(e):
             raise
-        # host — доменное имя, резолвим
+        # host — доменное имя, резолвим все адреса
         try:
-            resolved_ip = socket.gethostbyname(host)
-            ip = ipaddress.ip_address(resolved_ip)
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                raise ValueError("URL ведёт на приватный IP")
+            addr_infos = socket.getaddrinfo(host, None)
+            for info in addr_infos:
+                ip = ipaddress.ip_address(info[4][0])
+                if _is_blocked_ip(ip):
+                    raise ValueError("URL ведёт на приватный IP")
         except socket.gaierror:
             raise ValueError("Не удалось определить хост")
 
 
+def _safe_get(url: str) -> requests.Response:
+    """Follow redirects only after validating each redirect target against SSRF rules."""
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; DomikBot/1.0)"}
+    max_redirects = 5
+    for _ in range(max_redirects + 1):
+        resp = requests.get(url, headers=headers, timeout=15, allow_redirects=False)
+        if resp.status_code in (301, 302, 303, 307, 308):
+            location = resp.headers.get("Location", "")
+            if not location:
+                break
+            # Resolve relative redirects
+            if location.startswith("/"):
+                parsed = urlparse(url)
+                location = f"{parsed.scheme}://{parsed.netloc}{location}"
+            _validate_url(location)
+            url = location
+            continue
+        return resp
+    return resp
+
+
 def process_url(url: str) -> NormalizedContent:
     _validate_url(url)
-    resp = requests.get(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; DomikBot/1.0)"},
-        timeout=15,
-        allow_redirects=True,
-    )
+    resp = _safe_get(url)
     resp.raise_for_status()
     resp.encoding = resp.apparent_encoding
 

@@ -1,5 +1,6 @@
 import secrets
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from fastapi.templating import Jinja2Templates
 
@@ -13,6 +14,19 @@ def _moscow(dt: datetime | None) -> str:
 
 
 templates.env.filters["moscow"] = _moscow
+
+
+def _safe_url(url: str) -> str:
+    """Allow only http/https URLs in href attributes."""
+    try:
+        if url and urlparse(url).scheme in ("http", "https"):
+            return url
+    except Exception:
+        pass
+    return "#"
+
+
+templates.env.filters["safe_url"] = _safe_url
 
 _orig_response = templates.TemplateResponse
 

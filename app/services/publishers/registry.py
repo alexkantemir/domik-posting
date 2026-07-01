@@ -13,12 +13,14 @@ from app.services.publishers.telegram import (
     TelegramStoriesPublisher,
 )
 from app.services.publishers.vk import VKPublisher
+from app.services.publishers.max_publisher import MAXPublisher
 
 PUBLISHERS = [
     TelegramChannelPublisher(),
     TelegramGroupPublisher(),
     TelegramStoriesPublisher(),
     VKPublisher(),
+    MAXPublisher(),
     # OKPublisher(),          # подключить в Sprint 5
     # YandexMapsPublisher(),  # подключить в Sprint 5
     # YandexZenPublisher(),   # подключить в Sprint 5

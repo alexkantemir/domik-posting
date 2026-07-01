@@ -98,11 +98,11 @@
     .skip-link:focus { top:0; }
   </style>
 </head>
-<body>
+<body data-csrf="{{ csrf_token | e }}">
 
 {% if user is defined and user %}
 <a class="skip-link" href="#main-content">Перейти к содержимому</a>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="sidebar" id="sidebar">
   <a class="sidebar-logo" href="/dashboard"><span aria-hidden="true">🏠</span> Домик <span>постинг</span></a>
   <nav aria-label="Навигация">
@@ -128,6 +128,9 @@
     <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">
       <i class="bi bi-people"></i> Пользователи
     </a>
+    <a href="/admin/prompts" class="{% if '/admin/prompts' in request.url.path %}active{% endif %}">
+      <i class="bi bi-chat-square-text"></i> Промпты
+    </a>
     {% endif %}
   </nav>
   <div class="sidebar-footer">
@@ -137,7 +140,7 @@
 
 <div class="main-wrapper">
   <div class="topbar">
-    <button class="btn btn-sm btn-light d-md-none" onclick="toggleSidebar()" aria-label="Открыть меню" aria-expanded="false" id="sidebarToggle">
+    <button class="btn btn-sm btn-light d-md-none" aria-label="Открыть меню" aria-expanded="false" id="sidebarToggle">
       <i class="bi bi-list" aria-hidden="true"></i>
     </button>
     <div></div>
@@ -173,27 +176,7 @@
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-const CSRF_TOKEN = {{ csrf_token | tojson if csrf_token else '""' }};
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const open = sidebar.classList.toggle('open');
-  document.getElementById('sidebarOverlay').style.display = open ? 'block' : 'none';
-  const btn = document.getElementById('sidebarToggle');
-  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  const ov = document.getElementById('sidebarOverlay');
-  if (ov) ov.style.display = 'none';
-}
-// Close sidebar when a nav link is clicked on mobile
-document.querySelectorAll('.sidebar nav a').forEach(function(a) {
-  a.addEventListener('click', function() {
-    if (window.innerWidth < 768) closeSidebar();
-  });
-});
-</script>
+<script src="/static/base.js"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

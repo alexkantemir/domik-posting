@@ -5,9 +5,19 @@
 # Внутренние отчёты аудита (не для публичного репо)
 docs/
 
-# Скрипты с захардкоженными учётными данными
+# Скрипты с захардкоженными учётными данными или временные
 deploy_sftp.py
-scripts/_fix_admin.py
+scripts/_*.py
+scripts/get_vk_token.py
+scripts/test_vk_photo.py
+
+# Внутренние документы — не для публичного репо
+SECURITY_AUDIT_*.md
+SSH_ACCESS.md
+domik-putty-key/
+
+# PostgreSQL TLS сертификаты (хранятся только на сервере)
+pg-certs/
 
 # Claude Code — содержит учётные данные сервера
 .claude/

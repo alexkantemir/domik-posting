@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Системные промпты — Домик{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Системные промпты</h4>
+    <div class="text-muted" style="font-size:.85rem;">
+      Инструкции, которые получает GigaChat при генерации постов для каждой соцсети
+    </div>
+  </div>
+</div>
+
+{% if flash %}
+<div class="alert alert-success alert-dismissible fade show py-2 px-3 mb-3" role="alert" style="font-size:.9rem;">
+  {{ flash }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="alert alert-info py-2 px-3 mb-4" style="font-size:.85rem;">
+  <i class="bi bi-info-circle"></i>
+  Изменения вступают в силу <strong>сразу</strong> — следующая генерация постов будет использовать новый промпт.
+  Кнопка «Сброс» возвращает стандартный промпт из кода.
+</div>
+
+{% for prompt in prompts %}
+<div class="stat-card mb-3">
+  <div class="d-flex align-items-start justify-content-between gap-3">
+    <div class="flex-grow-1" style="min-width:0;">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="fw-semibold" style="color:#1a3c5e; font-size:.95rem;">{{ prompt.platform_name }}</span>
+        <span class="badge bg-secondary" style="font-size:.72rem; font-weight:500;">{{ prompt.platform_id }}</span>
+      </div>
+      <div style="font-size:.82rem; color:#555; white-space:pre-wrap; line-height:1.5;
+                  max-height:120px; overflow:hidden; position:relative;"
+           id="preview-{{ loop.index }}">{{ prompt.prompt[:400] }}{% if prompt.prompt|length > 400 %}…{% endif %}</div>
+      {% if prompt.updated_at %}
+      <div class="text-muted mt-2" style="font-size:.75rem;">
+        <i class="bi bi-clock"></i> Обновлён: {{ prompt.updated_at | moscow }} МСК
+        {% if prompt.editor %} · {{ prompt.editor.name }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-column gap-2" style="min-width:120px;">
+      <a href="/admin/prompts/{{ prompt.platform_id }}/edit"
+         class="btn btn-sm fw-semibold"
+         style="background:#1a3c5e;color:#fff;border-radius:8px;font-size:.82rem;">
+        <i class="bi bi-pencil"></i> Редактировать
+      </a>
+      <form method="post" action="/admin/prompts/{{ prompt.platform_id }}/reset"
+            onsubmit="return confirm('Сбросить промпт для {{ prompt.platform_name }} к значению по умолчанию?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary w-100"
+                style="border-radius:8px;font-size:.82rem;">
+          <i class="bi bi-arrow-counterclockwise"></i> Сброс
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% if not prompts %}
+<div class="stat-card text-center text-muted py-5">
+  <i class="bi bi-exclamation-circle" style="font-size:2rem; opacity:.3;"></i>
+  <div class="mt-2">Промпты не найдены — перезапустите приложение для автозаполнения</div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,3 +1,5 @@
+from sqlalchemy.orm import Session
+
 from app.services.content_processor import NormalizedContent
 from app.services.gigachat import generate_text
 from app.services.prompts import PLATFORM_PROMPTS
@@ -16,15 +18,28 @@ def _is_refusal(text: str) -> bool:
     return any(m in text for m in _REFUSAL_MARKERS)
 
 
-def generate_posts(content: NormalizedContent) -> dict:
+def _load_prompts(db: Session) -> dict:
+    """Загружает промпты из БД; если таблица пуста — возвращает захардкоженные."""
+    from app.models import PromptTemplate
+    rows = db.query(PromptTemplate).all()
+    if rows:
+        return {r.platform_id: r.prompt for r in rows}
+    return PLATFORM_PROMPTS
+
+
+def generate_posts(content: NormalizedContent, db: Session) -> dict:
     """
     Генерирует тексты постов для всех платформ через GigaChat.
     Возвращает: {platform_id: {"text": str, "ok": bool, "error": str|None}}
     """
-    user_message = f"Подготовь информационный пост для официальной страницы образовательного учреждения на основе следующего материала:\n\n{content.text}"
+    prompts = _load_prompts(db)
+    user_message = (
+        "Подготовь информационный пост для официальной страницы образовательного учреждения "
+        f"на основе следующего материала:\n\n{content.text}"
+    )
 
     results = {}
-    for platform, system_prompt in PLATFORM_PROMPTS.items():
+    for platform, system_prompt in prompts.items():
         text = ""
         error = None
         ok = False

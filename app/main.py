@@ -18,6 +18,28 @@ from app.scheduler import publish_scheduled_posts
 Base.metadata.create_all(bind=engine)
 
 
+def _seed_prompts() -> None:
+    """Заполняет таблицу промптов при первом запуске."""
+    from app.database import SessionLocal
+    from app.models import PromptTemplate
+    from app.services.prompts import PLATFORM_PROMPTS, PLATFORM_DISPLAY_NAMES
+    db = SessionLocal()
+    try:
+        if db.query(PromptTemplate).count() == 0:
+            for pid, prompt in PLATFORM_PROMPTS.items():
+                db.add(PromptTemplate(
+                    platform_id=pid,
+                    platform_name=PLATFORM_DISPLAY_NAMES.get(pid, pid),
+                    prompt=prompt.strip(),
+                ))
+            db.commit()
+    finally:
+        db.close()
+
+
+_seed_prompts()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(timezone="UTC")
@@ -38,7 +60,7 @@ app = FastAPI(
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
-    max_age=86400,
+    max_age=28800,  # 8 часов
     https_only=True,
     same_site="lax",
 )

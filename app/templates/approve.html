@@ -17,7 +17,7 @@
 {% if item.source_url %}
 <div class="alert alert-light border mb-3 py-2 px-3" style="font-size:.85rem;">
   <i class="bi bi-link-45deg"></i> Источник:
-  <a href="{{ item.source_url }}" target="_blank">{{ item.source_url[:80] }}</a>
+  <a href="{{ item.source_url | safe_url }}" target="_blank" rel="noopener noreferrer">{{ item.source_url[:80] }}</a>
 </div>
 {% endif %}
 
@@ -53,8 +53,7 @@
         <div class="form-check mb-0">
           <input class="form-check-input platform-check" type="checkbox"
                  name="include_{{ post.id }}" id="chk_{{ post.id }}"
-                 value="1" checked
-                 onchange="toggleCard({{ post.id }}, this.checked)">
+                 value="1" checked data-post-id="{{ post.id }}">
         </div>
         {% endif %}
         <label class="fw-semibold mb-0" for="chk_{{ post.id }}"
@@ -67,8 +66,8 @@
           {{ post.text | length if post.text else 0 }} симв.
         </span>
         {% if post.text %}
-        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
-                id="copy-{{ post.id }}" onclick="copyPostText('{{ post.id }}')"
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 copy-btn"
+                id="copy-{{ post.id }}" data-post-id="{{ post.id }}"
                 title="Скопировать текст" style="font-size:.75rem; border-radius:6px;">
           <i class="bi bi-clipboard"></i>
         </button>
@@ -106,12 +105,11 @@
     {% endfor %}
     {% else %}
     <textarea class="form-control post-textarea" name="text_{{ post.id }}"
-              id="ta-{{ post.id }}" rows="5"
-              style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc;"
-              oninput="updateCount({{ post.id }}, this.value)">{{ post.text or '' }}</textarea>
+              id="ta-{{ post.id }}" rows="5" data-post-id="{{ post.id }}"
+              style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc;">{{ post.text or '' }}</textarea>
     <div class="text-end mt-1">
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="save-{{ post.id }}"
-              onclick="savePost({{ post.id }})" style="font-size:.78rem; border-radius:6px;">
+      <button type="button" class="btn btn-sm btn-outline-secondary save-btn" id="save-{{ post.id }}"
+              data-post-id="{{ post.id }}" style="font-size:.78rem; border-radius:6px;">
         <i class="bi bi-floppy"></i> Сохранить правки
       </button>
     </div>
@@ -127,12 +125,12 @@
     <div class="d-flex gap-3 flex-wrap">
       <div class="form-check">
         <input class="form-check-input" type="radio" name="schedule_mode"
-               id="now_radio" value="now" checked onchange="toggleSchedule(false)">
+               id="now_radio" value="now" checked>
         <label class="form-check-label" for="now_radio">Сразу после согласования</label>
       </div>
       <div class="form-check">
         <input class="form-check-input" type="radio" name="schedule_mode"
-               id="later_radio" value="later" onchange="toggleSchedule(true)">
+               id="later_radio" value="later">
         <label class="form-check-label" for="later_radio">Запланировать на время</label>
       </div>
     </div>
@@ -173,128 +171,11 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-danger" onclick="submitReject()">Отклонить</button>
+        <button type="button" class="btn btn-danger" id="confirmRejectBtn">Отклонить</button>
       </div>
     </div>
   </div>
 </div>
 
-<script>
-function submitReject() {
-  bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
-  const inp = document.createElement('input');
-  inp.type = 'hidden'; inp.name = 'action'; inp.value = 'reject_all';
-  document.getElementById('approveForm').appendChild(inp);
-  document.getElementById('approveForm').submit();
-}
-
-const PLATFORM_LIMITS = {
-  telegram_channel: 4096,
-  telegram_group: 4096,
-  vk_group: 4096,
-};
-const DEFAULT_LIMIT = 4096;
-
-function getLimit(postId) {
-  const card = document.getElementById('card-' + postId);
-  if (!card) return DEFAULT_LIMIT;
-  const platform = card.dataset.platform || '';
-  return PLATFORM_LIMITS[platform] || DEFAULT_LIMIT;
-}
-
-function updateCount(id, text) {
-  const limit = getLimit(id);
-  const len = text.length;
-  const pct = len / limit;
-  const el = document.getElementById('cc-' + id);
-  el.textContent = len + ' / ' + limit + ' симв.';
-  if (pct >= 0.95) {
-    el.className = 'char-count text-danger fw-semibold';
-  } else if (pct >= 0.80) {
-    el.className = 'char-count text-warning fw-semibold';
-  } else {
-    el.className = 'char-count text-muted';
-  }
-}
-
-function toggleCard(id, enabled) {
-  const ta = document.getElementById('ta-' + id);
-  const card = document.getElementById('card-' + id);
-  if (ta) ta.disabled = !enabled;
-  card.style.opacity = enabled ? '1' : '0.4';
-}
-
-function toggleSchedule(show) {
-  document.getElementById('schedule_block').style.display = show ? 'block' : 'none';
-  if (show) {
-    const d = new Date();
-    d.setHours(d.getHours() + 4); // UTC+3 + 1h ahead
-    document.getElementById('scheduled_at').value = d.toISOString().slice(0,16);
-  }
-}
-
-// Block approve button on submit to prevent double-publish
-document.querySelector('form').addEventListener('submit', function(e) {
-  const btn = document.getElementById('approveBtn');
-  if (e.submitter && e.submitter.value === 'approve') {
-    if (btn.dataset.submitting) { e.preventDefault(); return; }
-    btn.dataset.submitting = '1';
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Публикуем...';
-  }
-});
-
-function savePost(id) {
-  const ta = document.getElementById('ta-' + id);
-  if (!ta) return;
-  const btn = document.getElementById('save-' + id);
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
-  const fd = new FormData();
-  fd.append('text', ta.value);
-  fd.append('csrf_token', CSRF_TOKEN);
-  fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(data => {
-      if (!btn) return;
-      btn.disabled = false;
-      if (data.ok) {
-        btn.innerHTML = '<i class="bi bi-check2"></i> Сохранено';
-        btn.classList.add('btn-success'); btn.classList.remove('btn-outline-secondary');
-        setTimeout(function() {
-          btn.innerHTML = orig;
-          btn.classList.remove('btn-success'); btn.classList.add('btn-outline-secondary');
-        }, 2000);
-      } else {
-        btn.innerHTML = orig;
-      }
-    })
-    .catch(function() { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
-}
-
-// Init char counts
-document.querySelectorAll('.post-textarea').forEach(function(ta) {
-  const id = ta.id.replace('ta-', '');
-  updateCount(id, ta.value);
-});
-
-function copyPostText(id) {
-  const ta = document.getElementById('ta-' + id);
-  const pub = document.querySelector('#card-' + id + ' .p-3');
-  const text = ta ? ta.value : (pub ? pub.textContent.trim() : '');
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(function() {
-    const btn = document.getElementById('copy-' + id);
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-check2"></i>';
-    btn.classList.add('btn-success');
-    btn.classList.remove('btn-outline-secondary');
-    setTimeout(function() {
-      btn.innerHTML = orig;
-      btn.classList.remove('btn-success');
-      btn.classList.add('btn-outline-secondary');
-    }, 1500);
-  });
-}
-</script>
+<script src="/static/approve.js"></script>
 {% endblock %}

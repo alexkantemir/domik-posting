@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str  # Обязательный — нет дефолта, должен быть в .env
     DATABASE_URL: str = "sqlite:///./domik.db"
 
     # Telegram
@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # VK
     VK_COMMUNITY_TOKEN: str = ""
+    VK_USER_TOKEN: str = ""
     VK_GROUP_ID: str = ""
 
     # GigaChat
@@ -34,6 +35,10 @@ class Settings(BaseSettings):
     META_APP_SECRET: str = ""
     META_PAGE_ACCESS_TOKEN: str = ""
     INSTAGRAM_ACCOUNT_ID: str = ""
+
+    # MAX (max.ru)
+    MAX_BOT_TOKEN: str = ""
+    MAX_CHAT_ID: str = ""
 
     class Config:
         env_file = ".env"

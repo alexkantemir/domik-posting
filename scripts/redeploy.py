@@ -1,6 +1,7 @@
 """
 Быстрый редеплой: загружает изменённые файлы и пересобирает контейнер app.
-Запуск: py -3.13 scripts/redeploy.py --host IP --user root --password PASS
+Запуск (ключ):    py -3.13 scripts/redeploy.py --host IP --user root --key ~/.ssh/id_ed25519_domik
+Запуск (пароль):  py -3.13 scripts/redeploy.py --host IP --user root --password PASS
 """
 import argparse
 import os
@@ -38,6 +39,7 @@ UPLOAD_FILES = [
     "app/services/publishers/base.py",
     "app/services/publishers/telegram.py",
     "app/services/publishers/vk.py",
+    "app/services/publishers/max_publisher.py",
     "app/services/publishers/registry.py",
     "app/scheduler.py",
     "app/templates/base.html",
@@ -97,14 +99,31 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True)
     parser.add_argument("--user", default="root")
-    parser.add_argument("--password", required=True)
+    parser.add_argument("--password", default=None)
+    parser.add_argument("--key", default=None, help="Путь к приватному SSH-ключу")
     args = parser.parse_args()
 
     print(f"\n🔄 Редеплой на {args.host}\n")
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(args.host, username=args.user, password=args.password, timeout=30)
+
+    if args.key:
+        key_path = os.path.expanduser(args.key)
+        pkey = paramiko.Ed25519Key(filename=key_path)
+        ssh.connect(args.host, username=args.user, pkey=pkey, timeout=30)
+    elif args.password:
+        ssh.connect(args.host, username=args.user, password=args.password, timeout=30)
+    else:
+        # Попытка автоматического выбора ключа из ~/.ssh/
+        default_key = os.path.expanduser(r"~\.ssh\id_ed25519_domik")
+        if os.path.exists(default_key):
+            pkey = paramiko.Ed25519Key(filename=default_key)
+            ssh.connect(args.host, username=args.user, pkey=pkey, timeout=30)
+        else:
+            print("Ошибка: укажи --key или --password")
+            sys.exit(1)
+
     print("✅ SSH подключение установлено\n")
 
     print("1. Загружаем файлы...")

@@ -7,14 +7,19 @@ from app.services.publishers.base import BasePublisher, PublishResult
 CAPTION_LIMIT = 1024
 
 
+def _escape_html(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _send_to_chat(base_url: str, chat_id: str, text: str, image_path: Optional[str]) -> dict:
     """Send photo+text or text-only, respecting Telegram's 1024-char caption limit."""
+    safe_text = _escape_html(text)
     if image_path:
-        if len(text) <= CAPTION_LIMIT:
+        if len(safe_text) <= CAPTION_LIMIT:
             with open(image_path, "rb") as photo:
                 resp = requests.post(
                     f"{base_url}/sendPhoto",
-                    data={"chat_id": chat_id, "caption": text, "parse_mode": "HTML"},
+                    data={"chat_id": chat_id, "caption": safe_text, "parse_mode": "HTML"},
                     files={"photo": photo},
                     timeout=30,
                 )
@@ -32,14 +37,14 @@ def _send_to_chat(base_url: str, chat_id: str, text: str, image_path: Optional[s
                 return r1.json()
             r2 = requests.post(
                 f"{base_url}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+                json={"chat_id": chat_id, "text": safe_text, "parse_mode": "HTML"},
                 timeout=30,
             )
             return r2.json()
     else:
         resp = requests.post(
             f"{base_url}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            json={"chat_id": chat_id, "text": safe_text, "parse_mode": "HTML"},
             timeout=30,
         )
         return resp.json()

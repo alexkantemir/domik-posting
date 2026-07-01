@@ -40,8 +40,8 @@
     </div>
     <div class="d-flex align-items-center gap-2">
       {% if post.text %}
-      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
-              id="copy-{{ post.id }}" onclick="copyPostText('{{ post.id }}')"
+      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 copy-btn"
+              id="copy-{{ post.id }}" data-post-id="{{ post.id }}"
               title="Скопировать текст" style="font-size:.75rem; border-radius:6px;">
         <i class="bi bi-clipboard"></i>
       </button>
@@ -62,13 +62,12 @@
   </div>
 
   {% if post.status == 'draft' and post.text %}
-  <textarea class="form-control" id="ta-{{ post.id }}" rows="5"
-            style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc; white-space:pre-wrap;"
-            oninput="previewUpdateCount({{ post.id }}, this.value)">{{ post.text }}</textarea>
+  <textarea class="form-control post-textarea" id="ta-{{ post.id }}" rows="5" data-post-id="{{ post.id }}"
+            style="font-size:.88rem; line-height:1.6; resize:vertical; border:1px solid #e8edf3; background:#f8fafc; white-space:pre-wrap;">{{ post.text }}</textarea>
   <div class="d-flex justify-content-between align-items-center mt-2">
     <span class="text-muted" id="cc-prev-{{ post.id }}" style="font-size:.78rem;">{{ post.text | length }} симв.</span>
-    <button type="button" class="btn btn-sm btn-outline-primary" id="save-{{ post.id }}"
-            onclick="savePost({{ post.id }})" style="border-radius:6px; font-size:.82rem;">
+    <button type="button" class="btn btn-sm btn-outline-primary save-btn" id="save-{{ post.id }}"
+            data-post-id="{{ post.id }}" style="border-radius:6px; font-size:.82rem;">
       <i class="bi bi-floppy"></i> Сохранить черновик
     </button>
   </div>
@@ -116,57 +115,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function copyPostText(id) {
-  const ta = document.getElementById('ta-' + id);
-  const el = document.getElementById('text-' + id);
-  const text = ta ? ta.value.trim() : (el ? el.textContent.trim() : '');
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(function() {
-    const btn = document.getElementById('copy-' + id);
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-check2"></i>';
-    btn.classList.add('btn-success');
-    btn.classList.remove('btn-outline-secondary');
-    setTimeout(function() {
-      btn.innerHTML = orig;
-      btn.classList.remove('btn-success');
-      btn.classList.add('btn-outline-secondary');
-    }, 1500);
-  });
-}
-
-function previewUpdateCount(id, text) {
-  const el = document.getElementById('cc-prev-' + id);
-  if (el) el.textContent = text.length + ' симв.';
-}
-
-function savePost(id) {
-  const ta = document.getElementById('ta-' + id);
-  if (!ta) return;
-  const btn = document.getElementById('save-' + id);
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>'; }
-  const fd = new FormData();
-  fd.append('text', ta.value);
-  fd.append('csrf_token', CSRF_TOKEN);
-  fetch('/posts/' + id + '/save', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(data => {
-      if (!btn) return;
-      btn.disabled = false;
-      if (data.ok) {
-        btn.innerHTML = '<i class="bi bi-check2"></i> Сохранено';
-        btn.classList.add('btn-success'); btn.classList.remove('btn-outline-primary');
-        setTimeout(function() {
-          btn.innerHTML = orig;
-          btn.classList.remove('btn-success'); btn.classList.add('btn-outline-primary');
-        }, 2000);
-      } else {
-        btn.innerHTML = orig;
-      }
-    })
-    .catch(function() { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
-}
-</script>
+<script src="/static/preview.js"></script>
 {% endblock %}

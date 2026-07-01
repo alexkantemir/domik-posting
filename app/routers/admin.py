@@ -6,7 +6,7 @@ from app.auth import get_current_user, hash_password
 from app.csrf import validate_csrf
 from app.database import get_db
 from app.jinja import templates
-from app.models import User
+from app.models import PromptTemplate, User
 
 router = APIRouter(prefix="/admin")
 
@@ -72,10 +72,10 @@ async def user_new_submit(
             "user": user, "roles": ROLES, "target": None,
             "error": "Недопустимая роль",
         })
-    if len(password) < 6:
+    if len(password) < 12:
         return templates.TemplateResponse(request, "admin_user_form.html", {
             "user": user, "roles": ROLES, "target": None,
-            "error": "Пароль должен быть не менее 6 символов",
+            "error": "Пароль должен быть не менее 12 символов",
         })
     if db.query(User).filter(User.email == email.lower()).first():
         return templates.TemplateResponse(request, "admin_user_form.html", {
@@ -155,10 +155,10 @@ async def user_edit_submit(
     target.role = role
 
     if password:
-        if len(password) < 6:
+        if len(password) < 12:
             return templates.TemplateResponse(request, "admin_user_form.html", {
                 "user": user, "roles": ROLES, "target": target,
-                "error": "Пароль должен быть не менее 6 символов",
+                "error": "Пароль должен быть не менее 12 символов",
             })
         target.password_hash = hash_password(password)
 
@@ -186,6 +186,87 @@ async def user_toggle(user_id: int, request: Request, db: Session = Depends(get_
         state = "активирован" if target.active else "деактивирован"
         request.session["flash"] = f"Пользователь {target.name} {state}."
     return RedirectResponse(url="/admin/users", status_code=302)
+
+
+# ─── Системные промпты ──────────────────────────────────────────────────────
+
+@router.get("/prompts", response_class=HTMLResponse)
+def prompts_list(request: Request, db: Session = Depends(get_db)):
+    user, redir = _require_admin(request, db)
+    if redir:
+        return redir
+    prompts = db.query(PromptTemplate).order_by(PromptTemplate.id).all()
+    flash = request.session.pop("flash", None)
+    return templates.TemplateResponse(request, "admin_prompts.html", {
+        "user": user, "prompts": prompts, "flash": flash,
+    })
+
+
+@router.get("/prompts/{platform_id}/edit", response_class=HTMLResponse)
+def prompt_edit_page(platform_id: str, request: Request, db: Session = Depends(get_db)):
+    user, redir = _require_admin(request, db)
+    if redir:
+        return redir
+    prompt = db.query(PromptTemplate).filter(PromptTemplate.platform_id == platform_id).first()
+    if not prompt:
+        return RedirectResponse(url="/admin/prompts", status_code=302)
+    return templates.TemplateResponse(request, "admin_prompt_edit.html", {
+        "user": user, "prompt": prompt, "error": None,
+    })
+
+
+@router.post("/prompts/{platform_id}/edit")
+async def prompt_edit_submit(
+    platform_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(default=""),
+    prompt_text: str = Form(...),
+):
+    user, redir = _require_admin(request, db)
+    if redir:
+        return redir
+    validate_csrf(request, csrf_token)
+
+    prompt = db.query(PromptTemplate).filter(PromptTemplate.platform_id == platform_id).first()
+    if not prompt:
+        return RedirectResponse(url="/admin/prompts", status_code=302)
+
+    text = prompt_text.strip()
+    if len(text) < 50:
+        return templates.TemplateResponse(request, "admin_prompt_edit.html", {
+            "user": user, "prompt": prompt,
+            "error": "Промпт слишком короткий (минимум 50 символов)",
+        })
+
+    from datetime import datetime, timezone
+    prompt.prompt = text
+    prompt.updated_at = datetime.now(timezone.utc)
+    prompt.updated_by = user.id
+    db.commit()
+
+    request.session["flash"] = f"Промпт для «{prompt.platform_name}» сохранён."
+    return RedirectResponse(url="/admin/prompts", status_code=302)
+
+
+@router.post("/prompts/{platform_id}/reset")
+async def prompt_reset(platform_id: str, request: Request, db: Session = Depends(get_db)):
+    user, redir = _require_admin(request, db)
+    if redir:
+        return redir
+    form = await request.form()
+    validate_csrf(request, form.get("csrf_token", ""))
+
+    from app.services.prompts import PLATFORM_PROMPTS
+    from datetime import datetime, timezone
+    prompt = db.query(PromptTemplate).filter(PromptTemplate.platform_id == platform_id).first()
+    if prompt and platform_id in PLATFORM_PROMPTS:
+        prompt.prompt = PLATFORM_PROMPTS[platform_id].strip()
+        prompt.updated_at = datetime.now(timezone.utc)
+        prompt.updated_by = user.id
+        db.commit()
+        request.session["flash"] = f"Промпт для «{prompt.platform_name}» сброшен к значению по умолчанию."
+    return RedirectResponse(url="/admin/prompts", status_code=302)
 
 
 # ─── Профиль: смена своего пароля ───────────────────────────────────────────
@@ -223,12 +304,16 @@ async def profile_submit(
 
     if not verify_password(password_old, user.password_hash):
         return err("Текущий пароль неверен")
-    if len(password_new) < 6:
-        return err("Новый пароль должен быть не менее 6 символов")
+    if len(password_new) < 12:
+        return err("Новый пароль должен быть не менее 12 символов")
     if password_new != password_new2:
         return err("Пароли не совпадают")
 
     user.password_hash = hash_password(password_new)
     db.commit()
+    # Инвалидируем текущую сессию, создаём новую (защита от перехвата)
+    user_id = user.id
+    request.session.clear()
+    request.session["user_id"] = user_id
     request.session["flash"] = "Пароль успешно изменён."
     return RedirectResponse(url="/admin/profile", status_code=302)

@@ -14,8 +14,8 @@ router = APIRouter()
 
 
 @router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    user = get_current_user(request, next(get_db()))
+def login_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
     if user:
         return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(request, "login.html", {"error": None, "email": ""})
@@ -43,6 +43,7 @@ async def login_submit(
 
 
 @router.post("/logout")
-def logout(request: Request):
+def logout(request: Request, csrf_token: str = Form(default="")):
+    validate_csrf(request, csrf_token)
     request.session.clear()
     return RedirectResponse(url="/login", status_code=302)

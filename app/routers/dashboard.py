@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -19,6 +19,7 @@ PLATFORM_NAMES = {
     "telegram_group": ("👥", "Telegram группа"),
     "telegram_stories": ("🎬", "Telegram Stories"),
     "vk": ("🔵", "ВКонтакте"),
+    "max": ("🟣", "MAX"),
     "ok": ("🟠", "Одноклассники"),
     "yandex_maps": ("📍", "Яндекс Карты"),
     "yandex_zen": ("📰", "Яндекс Дзен"),
@@ -31,14 +32,16 @@ def _item_display_status(item: ContentItem) -> str:
     statuses = {p.status for p in item.generated_posts}
     if "draft" in statuses:
         return "pending"
-    if "approved" in statuses:
-        now = datetime.utcnow()
-        for p in item.generated_posts:
-            if p.status == "approved" and p.scheduled_at and p.scheduled_at > now:
-                return "scheduled"
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if any(
+        p.status == "approved" and p.scheduled_at and p.scheduled_at > now
+        for p in item.generated_posts
+    ):
         return "scheduled"
     if "published" in statuses:
         return "published"
+    if "approved" in statuses:
+        return "scheduled"
     return "rejected"
 
 
@@ -48,14 +51,14 @@ def posts_pending(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    items = (
+    query = (
         db.query(ContentItem)
         .join(ContentItem.generated_posts)
         .filter(GeneratedPost.status == "draft")
-        .order_by(ContentItem.created_at.desc())
-        .distinct()
-        .all()
     )
+    if user.role == "editor":
+        query = query.filter(ContentItem.created_by == user.id)
+    items = query.order_by(ContentItem.created_at.desc()).distinct().all()
 
     flash = request.session.pop("flash", None)
 
@@ -79,18 +82,18 @@ def posts_scheduled(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    now = datetime.utcnow()
-    items = (
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    query = (
         db.query(ContentItem)
         .join(ContentItem.generated_posts)
         .filter(
             GeneratedPost.status == "approved",
             GeneratedPost.scheduled_at > now,
         )
-        .order_by(ContentItem.created_at.desc())
-        .distinct()
-        .all()
     )
+    if user.role == "editor":
+        query = query.filter(ContentItem.created_by == user.id)
+    items = query.order_by(ContentItem.created_at.desc()).distinct().all()
 
     return templates.TemplateResponse(
         request, "posts_list.html",
@@ -111,15 +114,12 @@ def posts_history(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    items = (
+    query = (
         db.query(ContentItem)
         .join(ContentItem.generated_posts)
         .filter(GeneratedPost.status.in_(["published", "rejected"]))
-        .order_by(ContentItem.created_at.desc())
-        .distinct()
-        .limit(50)
-        .all()
     )
+    items = query.order_by(ContentItem.created_at.desc()).distinct().limit(50).all()
 
     return templates.TemplateResponse(
         request, "posts_list.html",
@@ -140,7 +140,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     stats = {
         # Уникальные материалы (ContentItem), у которых есть хотя бы один пост в нужном статусе
         "pending": db.query(func.count(distinct(ContentItem.id)))

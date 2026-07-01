@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Редактировать промпт — Домик{% endblock %}
+
+{% block head %}
+<style>
+  #charCount { font-variant-numeric: tabular-nums; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="/admin/prompts" class="btn btn-sm btn-light me-3" style="border-radius:8px;">←</a>
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1a3c5e;">Редактировать промпт</h4>
+    <div class="text-muted" style="font-size:.85rem;">
+      {{ prompt.platform_name }}
+      <span class="badge bg-secondary ms-1" style="font-size:.72rem; font-weight:500;">{{ prompt.platform_id }}</span>
+    </div>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.9rem;">
+  <i class="bi bi-exclamation-circle"></i> {{ error }}
+</div>
+{% endif %}
+
+<div class="stat-card">
+  <form method="post" action="/admin/prompts/{{ prompt.platform_id }}/edit" id="promptForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="mb-1 d-flex justify-content-between align-items-baseline">
+      <label class="form-label fw-semibold mb-0" style="color:#1a3c5e; font-size:.9rem;">
+        Системный промпт
+      </label>
+      <span class="text-muted" style="font-size:.8rem;" id="charCount">{{ prompt.prompt | length }} симв.</span>
+    </div>
+    <div class="text-muted mb-2" style="font-size:.8rem;">
+      Это инструкция, которую получает GigaChat перед генерацией поста для <strong>{{ prompt.platform_name }}</strong>.
+      Следующее сообщение от пользователя — исходный материал.
+    </div>
+
+    <textarea name="prompt_text" id="promptTextarea" class="form-control font-monospace"
+              rows="18" required style="font-size:.83rem; line-height:1.55; resize:vertical;">{{ prompt.prompt }}</textarea>
+
+    <div class="d-flex gap-2 mt-3 flex-wrap">
+      <button type="submit" class="btn fw-semibold px-4"
+              style="background:#1a3c5e;color:#fff;border-radius:8px;">
+        <i class="bi bi-check2"></i> Сохранить
+      </button>
+      <a href="/admin/prompts" class="btn btn-light" style="border-radius:8px;">Отмена</a>
+
+      <form method="post" action="/admin/prompts/{{ prompt.platform_id }}/reset" class="ms-auto"
+            onsubmit="return confirm('Сбросить промпт для {{ prompt.platform_name }} к значению по умолчанию?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-outline-secondary"
+                style="border-radius:8px; font-size:.85rem;">
+          <i class="bi bi-arrow-counterclockwise"></i> Сбросить к умолчанию
+        </button>
+      </form>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/prompt_edit.js"></script>
+{% endblock %}

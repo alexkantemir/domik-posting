@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models import ContentItem, GeneratedPost, Publication
@@ -13,13 +13,14 @@ def publish_scheduled_posts() -> None:
     """Called every minute. Publishes approved posts whose scheduled_at has passed."""
     db = SessionLocal()
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         posts = (
             db.query(GeneratedPost)
             .filter(
                 GeneratedPost.status == "approved",
                 GeneratedPost.scheduled_at <= now,
             )
+            .with_for_update(skip_locked=True)
             .all()
         )
 
@@ -43,7 +44,7 @@ def publish_scheduled_posts() -> None:
                 pub = Publication(
                     generated_post_id=post.id,
                     platform=post.platform,
-                    published_at=datetime.utcnow() if result.success else None,
+                    published_at=datetime.now(timezone.utc).replace(tzinfo=None) if result.success else None,
                     platform_post_id=result.platform_post_id,
                     post_url=result.post_url,
                     success=result.success,

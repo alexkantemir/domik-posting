@@ -157,7 +157,7 @@ def content_new_submit(
 
     # Генерируем посты через GigaChat
     try:
-        generated = generate_posts(normalized)
+        generated = generate_posts(normalized, db)
     except Exception as e:
         db.delete(item)
         db.commit()
@@ -196,17 +196,6 @@ def content_preview(request: Request, item_id: int, db: Session = Depends(get_db
 
     posts = db.query(GeneratedPost).filter(GeneratedPost.content_item_id == item_id).all()
 
-    platform_names = {
-        "telegram_channel": ("✈️", "Telegram канал"),
-        "telegram_group": ("👥", "Telegram группа"),
-        "telegram_stories": ("🎬", "Telegram Stories"),
-        "vk": ("🔵", "ВКонтакте"),
-        "ok": ("🟠", "Одноклассники"),
-        "yandex_maps": ("📍", "Яндекс Карты"),
-        "yandex_zen": ("📰", "Яндекс Дзен"),
-        "instagram": ("📸", "Instagram"),
-    }
-
     file_paths = json.loads(item.file_paths or "[]")
     image_filename = os.path.basename(file_paths[0]) if file_paths else None
 
@@ -216,7 +205,7 @@ def content_preview(request: Request, item_id: int, db: Session = Depends(get_db
             "user": user,
             "item": item,
             "posts": posts,
-            "platform_names": platform_names,
+            "platform_names": PLATFORM_NAMES,
             "image_filename": image_filename,
         },
     )
@@ -227,6 +216,7 @@ PLATFORM_NAMES = {
     "telegram_group": ("👥", "Telegram группа"),
     "telegram_stories": ("🎬", "Telegram Stories"),
     "vk": ("🔵", "ВКонтакте"),
+    "max": ("🟣", "MAX"),
     "ok": ("🟠", "Одноклассники"),
     "yandex_maps": ("📍", "Яндекс Карты"),
     "yandex_zen": ("📰", "Яндекс Дзен"),
