@@ -34,6 +34,7 @@ Production: **https://post.domik-l.spb.ru** (сервер 201.51.6.88)
 ```
 app/
 ├── main.py              # Точка входа: создаёт таблицы, сидирует промпты, запускает scheduler
+├── event_log.py         # log_event() + mask_email() — JSONL-лог в logs/app.jsonl
 ├── config.py            # Все env-переменные (pydantic-settings), читает из .env
 ├── models.py            # SQLAlchemy модели (см. ниже)
 ├── auth.py              # get_current_user() из сессии, bcrypt хэши
@@ -63,6 +64,7 @@ app/
 │
 └── templates/           # Jinja2 HTML (base.html + страницы)
 
+logs/                    # JSONL-лог (volume на сервере, не в git — только .gitkeep)
 static/                  # JS-файлы (без inline JS для CSP)
 │   base.js              # toggleSidebar, closeSidebar, nav listeners
 │   approve.js           # логика страницы согласования
